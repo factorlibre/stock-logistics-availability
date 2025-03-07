@@ -77,7 +77,13 @@ class ProductProduct(models.Model):
                 )
 
             res[product.id]["potential_qty"] = potential_qty
-            res[product.id]["immediately_usable_qty"] += potential_qty
+            # if product has kit, immediately_usable_qty = potential_qty
+            # else immediately_usable_qty += potential_qty, because we don't
+            # want to duplicate the qty in immediate_usable_qty if it's a kit
+            if bom_id.type == "phantom":
+                res[product.id]["immediately_usable_qty"] = potential_qty
+            else:
+                res[product.id]["immediately_usable_qty"] += potential_qty
 
         return res, stock_dict
 
@@ -124,9 +130,11 @@ class ProductProduct(models.Model):
 
         for product in self:
             lines_done = []
+            bom_id = first(
+                product.bom_ids.filtered(lambda bom, p=product: bom.product_id == p)
+            ) or first(product.bom_ids)
             bom_lines = [
-                (first(product.bom_ids), bom_line, product, 1.0)
-                for bom_line in first(product.bom_ids).bom_line_ids
+                (bom_id, bom_line, product, 1.0) for bom_line in bom_id.bom_line_ids
             ]
 
             while bom_lines:
